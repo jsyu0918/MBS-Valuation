@@ -1,0 +1,914 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MBS Educational Dashboard</title>
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+    <!-- Font Awesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --primary: #4338ca;
+            --primary-light: #e0e7ff;
+            --primary-dark: #312e81;
+            --secondary: #6b7280;
+            --light: #f9fafb;
+            --dark: #1f2937;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --info: #3b82f6;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+        }
+
+        body {
+            background-color: #f3f4f6;
+            color: var(--dark);
+            line-height: 1.5;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 1rem;
+        }
+
+        header {
+            background-color: var(--primary-dark);
+            color: white;
+            padding: 1.5rem 0;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        header h1 {
+            font-size: 1.75rem;
+            margin-bottom: 0.5rem;
+        }
+
+        header p {
+            color: #e0e7ff;
+            font-size: 0.95rem;
+        }
+
+        nav {
+            background-color: white;
+            border-bottom: 1px solid #e5e7eb;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+        }
+
+        .tabs {
+            display: flex;
+            overflow-x: auto;
+        }
+
+        .tab {
+            padding: 1rem 1.25rem;
+            font-weight: 500;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            white-space: nowrap;
+        }
+
+        .tab.active {
+            color: var(--primary);
+            border-bottom-color: var(--primary);
+        }
+
+        .main-content {
+            padding: 2rem 0;
+        }
+
+        .grid {
+            display: grid;
+            gap: 1.5rem;
+            grid-template-columns: 1fr;
+        }
+
+        @media (min-width: 992px) {
+            .grid {
+                grid-template-columns: 300px 1fr;
+            }
+        }
+
+        .card {
+            background-color: white;
+            border-radius: 0.5rem;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            padding: 1.25rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .card h2 {
+            font-size: 1.25rem;
+            margin-bottom: 1rem;
+            color: var(--dark);
+        }
+
+        .card h3 {
+            font-size: 1rem;
+            margin-bottom: 0.75rem;
+            color: var(--dark);
+        }
+
+        .input-group {
+            margin-bottom: 1.25rem;
+        }
+
+        .input-group label {
+            display: block;
+            font-size: 0.875rem;
+            font-weight: 500;
+            margin-bottom: 0.5rem;
+            color: var(--secondary);
+        }
+
+        .range-group {
+            display: flex;
+            align-items: center;
+        }
+
+        .range-group input[type="range"] {
+            flex: 1;
+            margin-right: 0.5rem;
+        }
+
+        .range-value {
+            width: 4rem;
+            text-align: center;
+            font-weight: 500;
+        }
+
+        select {
+            width: 100%;
+            padding: 0.5rem;
+            border: 1px solid #d1d5db;
+            border-radius: 0.375rem;
+            font-size: 0.875rem;
+        }
+
+        .stat-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 0.5rem;
+        }
+
+        .stat-label {
+            color: var(--secondary);
+        }
+
+        .stat-value {
+            font-weight: 500;
+        }
+
+        .chart-container {
+            height: 300px;
+            position: relative;
+            margin-bottom: 1.5rem;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .two-columns {
+            display: grid;
+            gap: 1.5rem;
+            grid-template-columns: 1fr;
+        }
+
+        @media (min-width: 768px) {
+            .two-columns {
+                grid-template-columns: 1fr 1fr;
+            }
+        }
+
+        footer {
+            background-color: #f9fafb;
+            border-top: 1px solid #e5e7eb;
+            padding: 1.5rem 0;
+            text-align: center;
+            margin-top: 2rem;
+            color: var(--secondary);
+            font-size: 0.875rem;
+        }
+        
+        .progress-bar {
+            height: 0.5rem;
+            background-color: #e5e7eb;
+            border-radius: 9999px;
+            margin-bottom: 1rem;
+        }
+
+        .progress-fill {
+            height: 100%;
+            border-radius: 9999px;
+        }
+
+        .progress-fill.blue {
+            background-color: var(--info);
+        }
+
+        .progress-fill.green {
+            background-color: var(--success);
+        }
+
+        .progress-fill.yellow {
+            background-color: var(--warning);
+        }
+
+        .progress-fill.red {
+            background-color: var(--danger);
+        }
+        
+        .tranche-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 0.25rem;
+        }
+        
+        .key-concept {
+            display: flex;
+            margin-bottom: 0.75rem;
+        }
+
+        .concept-number {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 1.5rem;
+            height: 1.5rem;
+            border-radius: 9999px;
+            background-color: var(--primary-light);
+            color: var(--primary-dark);
+            font-weight: bold;
+            margin-right: 0.5rem;
+            margin-top: 0.125rem;
+            flex-shrink: 0;
+        }
+
+        .concept-title {
+            font-weight: 500;
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <header>
+        <div class="container">
+            <h1>Mortgage-Backed Securities (MBS) Educational Dashboard</h1>
+            <p>A visual simulation tool for understanding MBS valuation and cash flows</p>
+        </div>
+    </header>
+
+    <!-- Navigation Tabs -->
+    <nav>
+        <div class="container">
+            <div class="tabs">
+                <div class="tab active" data-tab="overview">Dashboard Overview</div>
+                <div class="tab" data-tab="bondvalue">Bond Value Analysis</div>
+                <div class="tab" data-tab="cashflows">Cash Flow Simulation</div>
+                <div class="tab" data-tab="prepayment">Prepayment Models</div>
+                <div class="tab" data-tab="cmo">CMO Structures</div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="main-content">
+        <div class="container">
+            <div class="grid">
+                <!-- Input Controls Panel -->
+                <div class="controls-panel">
+                    <div class="card">
+                        <h2>Model Inputs</h2>
+
+                        <div class="input-group">
+                            <label>Market Interest Rate (%)</label>
+                            <div class="range-group">
+                                <input type="range" id="interestRate" min="2" max="10" step="0.1" value="5.0">
+                                <span class="range-value" id="interestRateValue">5.0%</span>
+                            </div>
+                        </div>
+
+                        <div class="input-group">
+                            <label>PSA Prepayment Speed (%)</label>
+                            <div class="range-group">
+                                <input type="range" id="psaSpeed" min="0" max="300" step="25" value="100">
+                                <span class="range-value" id="psaSpeedValue">100%</span>
+                            </div>
+                        </div>
+
+                        <div class="input-group">
+                            <label>Mortgage Pool Size ($M)</label>
+                            <div class="range-group">
+                                <input type="range" id="poolSize" min="10" max="500" step="10" value="100">
+                                <span class="range-value" id="poolSizeValue">$100M</span>
+                            </div>
+                        </div>
+
+                        <div class="input-group">
+                            <label>Coupon Rate (%)</label>
+                            <div class="range-group">
+                                <input type="range" id="couponRate" min="2" max="8" step="0.25" value="4.5">
+                                <span class="range-value" id="couponRateValue">4.5%</span>
+                            </div>
+                        </div>
+
+                        <div class="input-group">
+                            <label>Mortgage Maturity (Years)</label>
+                            <select id="maturity">
+                                <option value="15">15 Years</option>
+                                <option value="20">20 Years</option>
+                                <option value="30" selected>30 Years</option>
+                            </select>
+                        </div>
+
+                        <div class="input-group">
+                            <label>Prepayment Model</label>
+                            <select id="prepaymentModel">
+                                <option value="PSA">PSA Model</option>
+                                <option value="NONE">No Prepayment</option>
+                            </select>
+                        </div>
+
+                        <div class="input-group">
+                            <label>CMO Tranche</label>
+                            <select id="selectedTranche">
+                                <option value="A">Tranche A (Senior)</option>
+                                <option value="B">Tranche B (Mezzanine)</option>
+                                <option value="C">Tranche C (Subordinate)</option>
+                                <option value="Z">Tranche Z (Accrual)</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <h2>Summary Metrics</h2>
+                        <div class="stat-row">
+                            <span class="stat-label">Current Bond Value:</span>
+                            <span class="stat-value" id="currentBondValue">$100.00M</span>
+                        </div>
+                        <div class="stat-row">
+                            <span class="stat-label">Present Value:</span>
+                            <span class="stat-value" id="presentValue">$95.25M</span>
+                        </div>
+                        <div class="stat-row">
+                            <span class="stat-label">WAL:</span>
+                            <span class="stat-value" id="wal">12.35 years</span>
+                        </div>
+                        <div class="stat-row">
+                            <span class="stat-label">Selected Tranche:</span>
+                            <span class="stat-value" id="trancheLabel">Tranche A</span>
+                        </div>
+                        <div class="stat-row">
+                            <span class="stat-label">Tranche Yield:</span>
+                            <span class="stat-value" id="trancheYield">4.25%</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Main Dashboard Area -->
+                <div class="dashboard-area">
+                    <!-- Overview Tab -->
+                    <div class="tab-content active" id="overview-content">
+                        <div class="card">
+                            <h2>Mortgage-Backed Securities Overview</h2>
+                            <div class="two-columns">
+                                <div>
+                                    <h3>Bond Value vs Interest Rate</h3>
+                                    <div class="chart-container">
+                                        <canvas id="bondValueChart"></canvas>
+                                    </div>
+                                </div>
+                                <div>
+                                    <h3>Cash Flow Composition</h3>
+                                    <div class="chart-container">
+                                        <canvas id="cashFlowChart"></canvas>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="two-columns">
+                            <div class="card">
+                                <h3>Key MBS Concepts</h3>
+                                <div class="key-concept">
+                                    <div class="concept-number">1</div>
+                                    <div>
+                                        <span class="concept-title">Prepayment Risk:</span>
+                                        The uncertainty of when borrowers will repay their mortgages early, affecting expected cash flows.
+                                    </div>
+                                </div>
+                                <div class="key-concept">
+                                    <div class="concept-number">2</div>
+                                    <div>
+                                        <span class="concept-title">PSA Model:</span>
+                                        Standard prepayment model assuming gradual increase in CPR rates, reaching 6% at month 30.
+                                    </div>
+                                </div>
+                                <div class="key-concept">
+                                    <div class="concept-number">3</div>
+                                    <div>
+                                        <span class="concept-title">Tranching:</span>
+                                        Dividing MBS cash flows into different risk classes with varied payment priorities and yields.
+                                    </div>
+                                </div>
+                                <div class="key-concept">
+                                    <div class="concept-number">4</div>
+                                    <div>
+                                        <span class="concept-title">Duration:</span>
+                                        Measure of price sensitivity to interest rate changes, affected by prepayment assumptions.
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="card">
+                                <h3>CMO Structure Summary</h3>
+                                <div>
+                                    <div class="tranche-header">
+                                        <span>Tranche A (Senior)</span>
+                                        <span id="trancheAValue">$70,000,000</span>
+                                    </div>
+                                    <div class="progress-bar">
+                                        <div class="progress-fill blue" style="width: 70%"></div>
+                                    </div>
+                                </div>
+                                <div>
+                                    <div class="tranche-header">
+                                        <span>Tranche B (Mezzanine)</span>
+                                        <span id="trancheBValue">$15,000,000</span>
+                                    </div>
+                                    <div class="progress-bar">
+                                        <div class="progress-fill green" style="width: 15%"></div>
+                                    </div>
+                                </div>
+                                <div>
+                                    <div class="tranche-header">
+                                        <span>Tranche C (Subordinate)</span>
+                                        <span id="trancheCValue">$10,000,000</span>
+                                    </div>
+                                    <div class="progress-bar">
+                                        <div class="progress-fill yellow" style="width: 10%"></div>
+                                    </div>
+                                </div>
+                                <div>
+                                    <div class="tranche-header">
+                                        <span>Tranche Z (Accrual)</span>
+                                        <span id="trancheZValue">$5,000,000</span>
+                                    </div>
+                                    <div class="progress-bar">
+                                        <div class="progress-fill red" style="width: 5%"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Bond Value Analysis Tab -->
+                    <div class="tab-content" id="bondvalue-content">
+                        <div class="card">
+                            <h2>Bond Value Analysis</h2>
+                            <p style="margin-bottom: 1rem; color: var(--secondary);">
+                                This analysis demonstrates the relationship between interest rates and MBS value.
+                                Note that MBS typically display negative convexity at lower interest rates due to increased prepayment risk.
+                            </p>
+                            <div class="chart-container">
+                                <canvas id="bondValueDetailChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Cash Flow Simulation Tab -->
+                    <div class="tab-content" id="cashflows-content">
+                        <div class="card">
+                            <h2>Mortgage Pool Cash Flow Simulation</h2>
+                            <p style="margin-bottom: 1rem; color: var(--secondary);">
+                                Cash flows from a mortgage pool consist of interest payments, scheduled principal repayments,
+                                and prepayments. This simulation shows how these components change over time and under different scenarios.
+                            </p>
+                            <div class="chart-container">
+                                <canvas id="cashFlowDetailChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Prepayment Models Tab -->
+                    <div class="tab-content" id="prepayment-content">
+                        <div class="card">
+                            <h2>PSA Prepayment Model</h2>
+                            <p style="margin-bottom: 1rem; color: var(--secondary);">
+                                The PSA prepayment model is the standard framework for projecting prepayment rates in MBS analysis.
+                                100% PSA assumes CPR increases by 0.2% monthly until reaching 6% at month 30, then remains constant.
+                            </p>
+                            <div class="chart-container">
+                                <canvas id="psaCurveChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- CMO Structures Tab -->
+                    <div class="tab-content" id="cmo-content">
+                        <div class="card">
+                            <h2>CMO Tranche Structure and Cash Flows</h2>
+                            <p style="margin-bottom: 1rem; color: var(--secondary);">
+                                This visualization shows how cash flows from the mortgage pool are allocated to different CMO tranches.
+                                Currently displaying selected tranche cash flows.
+                            </p>
+                            <div class="chart-container">
+                                <canvas id="trancheCashFlowChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+        <div class="container">
+            <p>Educational Dashboard for Graduate-Level Real Estate Finance | Mortgage-Backed Securities Simulation</p>
+            <p style="margin-top: 0.5rem">Developed for visualization and educational purposes only.</p>
+        </div>
+    </footer>
+
+    <script>
+        // Main state object
+        const state = {
+            interestRate: 5.0,
+            psaSpeed: 100,
+            poolSize: 100,
+            couponRate: 4.5,
+            maturity: 30,
+            selectedTranche: 'A',
+            prepaymentModel: 'PSA'
+        };
+
+        // Charts
+        let bondValueChart, cashFlowChart, bondValueDetailChart, cashFlowDetailChart, 
+            psaCurveChart, trancheCashFlowChart;
+
+        // Format currency
+        function formatCurrency(value) {
+            return new Intl.NumberFormat('en-US', {
+                style: 'currency',
+                currency: 'USD',
+                minimumFractionDigits: 0,
+                maximumFractionDigits: 0,
+            }).format(value);
+        }
+
+        // Calculate PSA prepayment rate
+        function calculatePsaRate(month, psaMultiplier) {
+            const basePsaRate = month <= 30 ? 0.2 * month : 6.0;
+            return (basePsaRate * psaMultiplier / 100) / 100;
+        }
+
+        // Calculate mortgage payment
+        function calculateMortgagePayment(principal, rate, term) {
+            const monthlyRate = rate / 12 / 100;
+            const months = term * 12;
+            return (principal * monthlyRate * Math.pow(1 + monthlyRate, months)) / 
+                   (Math.pow(1 + monthlyRate, months) - 1);
+        }
+
+        // Initialize charts
+        function initializeCharts() {
+            const ctx1 = document.getElementById('bondValueChart').getContext('2d');
+            bondValueChart = new Chart(ctx1, {
+                type: 'line',
+                data: {
+                    labels: [2, 3, 4, 5, 6, 7, 8],
+                    datasets: [{
+                        label: 'Bond Value ($M)',
+                        data: [120, 110, 100, 95, 92, 90, 88],
+                        borderColor: '#4338ca',
+                        backgroundColor: 'rgba(67, 56, 202, 0.1)',
+                        tension: 0.3,
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false
+                }
+            });
+
+            const ctx2 = document.getElementById('cashFlowChart').getContext('2d');
+            cashFlowChart = new Chart(ctx2, {
+                type: 'bar',
+                data: {
+                    labels: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+                    datasets: [
+                        {
+                            label: 'Interest',
+                            data: [4.5, 4.3, 4.1, 3.9, 3.6, 3.4, 3.1, 2.9, 2.6, 2.3],
+                            backgroundColor: '#8884d8'
+                        },
+                        {
+                            label: 'Scheduled Principal',
+                            data: [1.5, 1.7, 1.9, 2.1, 2.4, 2.6, 2.9, 3.1, 3.4, 3.7],
+                            backgroundColor: '#82ca9d'
+                        },
+                        {
+                            label: 'Prepayment',
+                            data: [1.0, 1.2, 1.5, 1.8, 2.0, 2.2, 2.5, 2.7, 3.0, 3.2],
+                            backgroundColor: '#ffc658'
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: {
+                            stacked: true,
+                            title: {
+                                display: true,
+                                text: 'Year'
+                            }
+                        },
+                        y: {
+                            stacked: true,
+                            title: {
+                                display: true,
+                                text: 'Cash Flow ($M)'
+                            }
+                        }
+                    }
+                }
+            });
+
+            const ctx3 = document.getElementById('bondValueDetailChart').getContext('2d');
+            bondValueDetailChart = new Chart(ctx3, {
+                type: 'line',
+                data: {
+                    labels: [2, 2.5, 3, 3.5, 4, 4.5, 5, 5.5, 6, 6.5, 7, 7.5, 8],
+                    datasets: [{
+                        label: 'Bond Value ($M)',
+                        data: [120, 115, 110, 105, 100, 97, 95, 93, 92, 91, 90, 89, 88],
+                        borderColor: '#4338ca',
+                        backgroundColor: 'rgba(67, 56, 202, 0.1)',
+                        tension: 0.3,
+                        fill: true
+                    },
+                    {
+                        label: 'Duration (Years)',
+                        data: [4.5, 4.8, 5.0, 5.3, 5.5, 5.8, 6.0, 6.2, 6.5, 6.7, 7.0, 7.2, 7.5],
+                        borderColor: '#10b981',
+                        borderDash: [5, 5],
+                        tension: 0.3,
+                        fill: false
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Interest Rate (%)'
+                            }
+                        }
+                    }
+                }
+            });
+
+            const ctx4 = document.getElementById('cashFlowDetailChart').getContext('2d');
+            cashFlowDetailChart = new Chart(ctx4, {
+                type: 'bar',
+                data: {
+                    labels: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15],
+                    datasets: [
+                        {
+                            label: 'Interest',
+                            data: [4.5, 4.3, 4.1, 3.9, 3.6, 3.4, 3.1, 2.9, 2.6, 2.3, 2.0, 1.7, 1.4, 1.1, 0.8],
+                            backgroundColor: '#8884d8'
+                        },
+                        {
+                            label: 'Scheduled Principal',
+                            data: [1.5, 1.7, 1.9, 2.1, 2.4, 2.6, 2.9, 3.1, 3.4, 3.7, 4.0, 4.3, 4.6, 4.9, 5.2],
+                            backgroundColor: '#82ca9d'
+                        },
+                        {
+                            label: 'Prepayment',
+                            data: [1.0, 1.2, 1.5, 1.8, 2.0, 2.2, 2.5, 2.7, 3.0, 3.2, 3.5, 3.7, 4.0, 4.2, 4.5],
+                            backgroundColor: '#ffc658'
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: {
+                            stacked: true,
+                            title: {
+                                display: true,
+                                text: 'Year'
+                            }
+                        },
+                        y: {
+                            stacked: true,
+                            title: {
+                                display: true,
+                                text: 'Cash Flow ($M)'
+                            }
+                        }
+                    }
+                }
+            });
+
+            const ctx5 = document.getElementById('psaCurveChart').getContext('2d');
+            psaCurveChart = new Chart(ctx5, {
+                type: 'line',
+                data: {
+                    labels: Array.from({length: 60}, (_, i) => i + 1),
+                    datasets: [
+                        {
+                            label: 'PSA 50%',
+                            data: Array.from({length: 60}, (_, i) => {
+                                const month = i + 1;
+                                return calculatePsaRate(month, 50) * 12 * 100;
+                            }),
+                            borderColor: '#8884d8',
+                            tension: 0.3
+                        },
+                        {
+                            label: 'PSA 100%',
+                            data: Array.from({length: 60}, (_, i) => {
+                                const month = i + 1;
+                                return calculatePsaRate(month, 100) * 12 * 100;
+                            }),
+                            borderColor: '#82ca9d',
+                            tension: 0.3
+                        },
+                        {
+                            label: 'PSA 200%',
+                            data: Array.from({length: 60}, (_, i) => {
+                                const month = i + 1;
+                                return calculatePsaRate(month, 200) * 12 * 100;
+                            }),
+                            borderColor: '#ffc658',
+                            tension: 0.3
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Month'
+                            }
+                        },
+                        y: {
+                            title: {
+                                display: true,
+                                text: 'Annual CPR (%)'
+                            }
+                        }
+                    }
+                }
+            });
+
+            const ctx6 = document.getElementById('trancheCashFlowChart').getContext('2d');
+            trancheCashFlowChart = new Chart(ctx6, {
+                type: 'bar',
+                data: {
+                    labels: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+                    datasets: [
+                        {
+                            label: 'Interest',
+                            data: [2.8, 2.6, 2.4, 2.2, 2.0, 1.8, 1.6, 1.4, 1.2, 1.0],
+                            backgroundColor: '#8884d8'
+                        },
+                        {
+                            label: 'Principal',
+                            data: [4.2, 4.4, 4.6, 4.8, 5.0, 5.2, 5.4, 5.6, 5.8, 6.0],
+                            backgroundColor: '#82ca9d'
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: {
+                            stacked: true,
+                            title: {
+                                display: true,
+                                text: 'Year'
+                            }
+                        },
+                        y: {
+                            stacked: true,
+                            title: {
+                                display: true,
+                                text: 'Cash Flow ($M)'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Update UI values based on user inputs
+        function updateUI() {
+            // Update display values
+            document.getElementById('interestRateValue').textContent = state.interestRate.toFixed(1) + '%';
+            document.getElementById('psaSpeedValue').textContent = state.psaSpeed + '%';
+            document.getElementById('poolSizeValue').textContent = '$' + state.poolSize + 'M';
+            document.getElementById('couponRateValue').textContent = state.couponRate.toFixed(2) + '%';
+            document.getElementById('trancheLabel').textContent = 'Tranche ' + state.selectedTranche;
+            
+            // Update tranche values based on pool size
+            document.getElementById('trancheAValue').textContent = formatCurrency(state.poolSize * 1000000 * 0.7);
+            document.getElementById('trancheBValue').textContent = formatCurrency(state.poolSize * 1000000 * 0.15);
+            document.getElementById('trancheCValue').textContent = formatCurrency(state.poolSize * 1000000 * 0.1);
+            document.getElementById('trancheZValue').textContent = formatCurrency(state.poolSize * 1000000 * 0.05);
+        }
+
+        // Setup event listeners
+        function setupEventListeners() {
+            // Input sliders and dropdowns
+            document.getElementById('interestRate').addEventListener('input', function(e) {
+                state.interestRate = parseFloat(e.target.value);
+                updateUI();
+            });
+            
+            document.getElementById('psaSpeed').addEventListener('input', function(e) {
+                state.psaSpeed = parseInt(e.target.value);
+                updateUI();
+            });
+            
+            document.getElementById('poolSize').addEventListener('input', function(e) {
+                state.poolSize = parseInt(e.target.value);
+                updateUI();
+            });
+            
+            document.getElementById('couponRate').addEventListener('input', function(e) {
+                state.couponRate = parseFloat(e.target.value);
+                updateUI();
+            });
+            
+            document.getElementById('maturity').addEventListener('change', function(e) {
+                state.maturity = parseInt(e.target.value);
+                updateUI();
+            });
+            
+            document.getElementById('prepaymentModel').addEventListener('change', function(e) {
+                state.prepaymentModel = e.target.value;
+                updateUI();
+            });
+            
+            document.getElementById('selectedTranche').addEventListener('change', function(e) {
+                state.selectedTranche = e.target.value;
+                updateUI();
+            });
+            
+            // Tab navigation
+            const tabs = document.querySelectorAll('.tab');
+            tabs.forEach(tab => {
+                tab.addEventListener('click', function() {
+                    // Remove active class from all tabs
+                    tabs.forEach(t => t.classList.remove('active'));
+                    // Add active class to clicked tab
+                    this.classList.add('active');
+                    
+                    // Hide all tab content
+                    document.querySelectorAll('.tab-content').forEach(content => {
+                        content.classList.remove('active');
+                    });
+                    
+                    // Show the corresponding tab content
+                    const tabId = this.getAttribute('data-tab');
+                    document.getElementById(tabId + '-content').classList.add('active');
+                });
+            });
+        }
+
+        // Initialize when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeCharts();
+            setupEventListeners();
+            updateUI();
+        });
+    </script>
+</body>
+</html>
