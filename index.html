@@ -261,6 +261,35 @@
         .concept-title {
             font-weight: 500;
         }
+        
+        .table-container {
+            overflow-x: auto;
+            margin-top: 1.5rem;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.875rem;
+        }
+        
+        th {
+            background-color: #f9fafb;
+            padding: 0.75rem;
+            text-align: left;
+            font-weight: 500;
+            color: var(--secondary);
+            border-bottom: 1px solid #e5e7eb;
+        }
+        
+        td {
+            padding: 0.75rem;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        
+        tr:nth-child(even) {
+            background-color: #f9fafb;
+        }
     </style>
 </head>
 <body>
@@ -487,6 +516,32 @@
                             <div class="chart-container">
                                 <canvas id="bondValueDetailChart"></canvas>
                             </div>
+                            
+                            <div class="table-container">
+                                <h3>Present Value Calculation</h3>
+                                <table>
+                                    <tr>
+                                        <td>Pool Size:</td>
+                                        <td id="pvPoolSize">$100,000,000</td>
+                                    </tr>
+                                    <tr>
+                                        <td>Total Future Cash Flows:</td>
+                                        <td id="futureCashFlows">$145,325,450</td>
+                                    </tr>
+                                    <tr>
+                                        <td>Discount Amount:</td>
+                                        <td id="discountAmount">$49,845,321</td>
+                                    </tr>
+                                    <tr>
+                                        <td style="font-weight: 500;">Present Value:</td>
+                                        <td id="pvTotal" style="font-weight: 500; color: var(--primary);">$95,480,129</td>
+                                    </tr>
+                                    <tr>
+                                        <td>Discount Rate (Monthly):</td>
+                                        <td id="discountRate">0.0042</td>
+                                    </tr>
+                                </table>
+                            </div>
                         </div>
                     </div>
 
@@ -500,6 +555,25 @@
                             </p>
                             <div class="chart-container">
                                 <canvas id="cashFlowDetailChart"></canvas>
+                            </div>
+                            
+                            <div class="table-container">
+                                <h3>Cash Flow Table (First 5 Years)</h3>
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            <th>Year</th>
+                                            <th>Interest</th>
+                                            <th>Scheduled Principal</th>
+                                            <th>Prepayment</th>
+                                            <th>Total Payment</th>
+                                            <th>Remaining Balance</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="cashFlowTableBody">
+                                        <!-- Cash flow data will be inserted here by JavaScript -->
+                                    </tbody>
+                                </table>
                             </div>
                         </div>
                     </div>
@@ -515,6 +589,11 @@
                             <div class="chart-container">
                                 <canvas id="psaCurveChart"></canvas>
                             </div>
+                            
+                            <div class="chart-container">
+                                <h3>Impact of Prepayment on Pool Balance</h3>
+                                <canvas id="poolBalanceChart"></canvas>
+                            </div>
                         </div>
                     </div>
 
@@ -528,6 +607,32 @@
                             </p>
                             <div class="chart-container">
                                 <canvas id="trancheCashFlowChart"></canvas>
+                            </div>
+                            
+                            <div class="table-container">
+                                <h3>Selected Tranche Details</h3>
+                                <table>
+                                    <tr>
+                                        <td>Original Balance:</td>
+                                        <td id="trancheOriginalBalance">$70,000,000</td>
+                                    </tr>
+                                    <tr>
+                                        <td>Coupon Rate:</td>
+                                        <td id="trancheCouponRate">4.00%</td>
+                                    </tr>
+                                    <tr>
+                                        <td>Weighted Average Life:</td>
+                                        <td id="trancheWAL">7.5 years</td>
+                                    </tr>
+                                    <tr>
+                                        <td>Yield:</td>
+                                        <td id="selectedTrancheYield">4.25%</td>
+                                    </tr>
+                                    <tr>
+                                        <td>Present Value:</td>
+                                        <td id="tranchePV">$68,500,000</td>
+                                    </tr>
+                                </table>
                             </div>
                         </div>
                     </div>
@@ -553,14 +658,19 @@
             couponRate: 4.5,
             maturity: 30,
             selectedTranche: 'A',
-            prepaymentModel: 'PSA'
+            prepaymentModel: 'PSA',
+            // Calculated data fields
+            bondValueData: [],
+            cashFlowData: [],
+            trancheData: {},
+            pvData: {}
         };
 
         // Charts
         let bondValueChart, cashFlowChart, bondValueDetailChart, cashFlowDetailChart, 
-            psaCurveChart, trancheCashFlowChart;
+            psaCurveChart, poolBalanceChart, trancheCashFlowChart;
 
-        // Format currency
+        // Helper functions
         function formatCurrency(value) {
             return new Intl.NumberFormat('en-US', {
                 style: 'currency',
@@ -568,6 +678,10 @@
                 minimumFractionDigits: 0,
                 maximumFractionDigits: 0,
             }).format(value);
+        }
+
+        function formatPercentage(value) {
+            return (value).toFixed(2) + '%';
         }
 
         // Calculate PSA prepayment rate
@@ -584,264 +698,740 @@
                    (Math.pow(1 + monthlyRate, months) - 1);
         }
 
+        // Calculate cash flows for a given mortgage pool
+        function calculateCashFlows() {
+            const monthlyRate = state.couponRate / 12 / 100;
+            const totalMonths = state.maturity * 12;
+            const monthlyPayment = calculateMortgagePayment(
+                state.poolSize * 1000000, 
+                state.couponRate, 
+                state.maturity
+            );
+            
+            let remainingBalance = state.poolSize * 1000000;
+            const cashFlows = [];
+            
+            for (let month = 1; month <= totalMonths; month++) {
+                const interestPayment = remainingBalance * monthlyRate;
+                let scheduledPrincipal = monthlyPayment - interestPayment;
+                
+                // Calculate prepayment based on selected model
+                let prepayment = 0;
+                if (state.prepaymentModel === 'PSA') {
+                    const psaRate = calculatePsaRate(month, state.psaSpeed);
+                    prepayment = (remainingBalance - scheduledPrincipal) * psaRate;
+                }
+                
+                const totalPrincipal = scheduledPrincipal + prepayment;
+                const totalPayment = interestPayment + totalPrincipal;
+                
+                cashFlows.push({
+                    month,
+                    year: Math.ceil(month / 12),
+                    interestPayment,
+                    scheduledPrincipal,
+                    prepayment,
+                    totalPrincipal,
+                    totalPayment,
+                    remainingBalance,
+                });
+                
+                remainingBalance -= totalPrincipal;
+                
+                // Break if balance is effectively zero
+                if (remainingBalance < 1) break;
+            }
+            
+            return cashFlows;
+        }
+
+        // Calculate bond values at different interest rates
+        function calculateBondValues() {
+            const cashFlows = calculateCashFlows();
+            const values = [];
+            
+            // Generate range of interest rates
+            for (let rate = 2; rate <= 10; rate += 0.2) {
+                rate = parseFloat(rate.toFixed(1)); // Fix precision
+                
+                const monthlyRate = rate / 12 / 100;
+                let presentValue = 0;
+                
+                cashFlows.forEach(cf => {
+                    const discountFactor = Math.pow(1 + monthlyRate, -cf.month);
+                    presentValue += cf.totalPayment * discountFactor;
+                });
+                
+                // Calculate duration
+                let duration = 0;
+                let sumWeightedCF = 0;
+                
+                cashFlows.forEach(cf => {
+                    const discountFactor = Math.pow(1 + monthlyRate, -cf.month);
+                    const weightedCF = cf.totalPayment * discountFactor * cf.month;
+                    sumWeightedCF += weightedCF;
+                });
+                
+                duration = sumWeightedCF / presentValue / 12; // Convert to years
+                
+                values.push({
+                    rate: rate,
+                    value: presentValue / 1000000,
+                    duration: duration
+                });
+            }
+            
+            return values;
+        }
+
+        // Calculate tranche cash flows
+        function calculateTrancheCashFlows() {
+            const cashFlows = calculateCashFlows();
+            const tranches = {
+                A: { priority: 1, balance: state.poolSize * 1000000 * 0.70, rate: state.couponRate - 0.5 },
+                B: { priority: 2, balance: state.poolSize * 1000000 * 0.15, rate: state.couponRate },
+                C: { priority: 3, balance: state.poolSize * 1000000 * 0.10, rate: state.couponRate + 0.5 },
+                Z: { priority: 4, balance: state.poolSize * 1000000 * 0.05, rate: state.couponRate + 1.0, accrual: true }
+            };
+            
+            // Set initial values
+            Object.keys(tranches).forEach(key => {
+                tranches[key].originalBalance = tranches[key].balance;
+                tranches[key].cashFlows = [];
+                tranches[key].remainingBalance = tranches[key].balance;
+                tranches[key].yearlyInterest = Array(30).fill(0);
+                tranches[key].yearlyPrincipal = Array(30).fill(0);
+            });
+            
+            // Process each monthly cash flow
+            cashFlows.forEach((cf, idx) => {
+                let remainingPrincipal = cf.totalPrincipal;
+                let remainingInterest = cf.interestPayment;
+                
+                // Distribute cash flows to each tranche by priority
+                Object.keys(tranches)
+                    .sort((a, b) => tranches[a].priority - tranches[b].priority)
+                    .forEach(tranche => {
+                        const trancheData = tranches[tranche];
+                        
+                        if (trancheData.remainingBalance <= 0) {
+                            return;
+                        }
+                        
+                        // Calculate interest for this tranche
+                        const monthlyRate = trancheData.rate / 12 / 100;
+                        const interestDue = trancheData.remainingBalance * monthlyRate;
+                        
+                        let interestPayment = 0;
+                        let principalPayment = 0;
+                        
+                        // Z tranche accrues interest until other tranches are paid off
+                        if (trancheData.accrual && 
+                            Object.keys(tranches).some(t => t !== 'Z' && tranches[t].remainingBalance > 0)) {
+                            // Accrue interest to balance for Z tranche
+                            trancheData.remainingBalance += interestDue;
+                        } else {
+                            // Normal interest payment
+                            interestPayment = Math.min(interestDue, remainingInterest);
+                            remainingInterest -= interestPayment;
+                            
+                            // Principal payment
+                            principalPayment = Math.min(remainingPrincipal, trancheData.remainingBalance);
+                            remainingPrincipal -= principalPayment;
+                            trancheData.remainingBalance -= principalPayment;
+                        }
+                        
+                        // Add to yearly totals
+                        const yearIndex = Math.floor((cf.month - 1) / 12);
+                        if (yearIndex < 30) {
+                            trancheData.yearlyInterest[yearIndex] += interestPayment;
+                            trancheData.yearlyPrincipal[yearIndex] += principalPayment;
+                        }
+                    });
+            });
+            
+            // Calculate weighted average life for each tranche
+            Object.keys(tranches).forEach(key => {
+                const tranche = tranches[key];
+                let totalPayment = 0;
+                let weightedPayment = 0;
+                
+                for (let year = 0; year < 30; year++) {
+                    const payment = tranche.yearlyInterest[year] + tranche.yearlyPrincipal[year];
+                    totalPayment += payment;
+                    weightedPayment += payment * (year + 0.5); // Midpoint of year
+                }
+                
+                tranche.WAL = totalPayment > 0 ? weightedPayment / totalPayment : 0;
+                
+                // Calculate simple yield approximation
+                const totalCashFlow = tranche.yearlyInterest.reduce((a, b) => a + b, 0) + 
+                                      tranche.yearlyPrincipal.reduce((a, b) => a + b, 0);
+                const totalReturn = totalCashFlow / tranche.originalBalance - 1;
+                tranche.yield = tranche.WAL > 0 ? Math.pow(1 + totalReturn, 1 / tranche.WAL) - 1 : 0;
+                
+                // Calculate present value
+                let presentValue = 0;
+                const monthlyDiscountRate = state.interestRate / 12 / 100;
+                
+                for (let year = 0; year < 30; year++) {
+                    const payment = tranche.yearlyInterest[year] + tranche.yearlyPrincipal[year];
+                    const discountFactor = Math.pow(1 + monthlyDiscountRate, -(year + 0.5) * 12); // Midpoint of year
+                    presentValue += payment * discountFactor;
+                }
+                
+                tranche.presentValue = presentValue;
+            });
+            
+            return tranches;
+        }
+
+        // Calculate present value data
+        function calculatePresentValue() {
+            const cashFlows = calculateCashFlows();
+            const monthlyRate = state.interestRate / 12 / 100;
+            
+            let presentValue = 0;
+            let futureValue = 0;
+            
+            cashFlows.forEach(cf => {
+                const discountFactor = Math.pow(1 + monthlyRate, -cf.month);
+                presentValue += cf.totalPayment * discountFactor;
+                futureValue += cf.totalPayment;
+            });
+            
+            return {
+                presentValue: presentValue,
+                futureValue: futureValue,
+                discount: futureValue - presentValue,
+                discountRate: monthlyRate
+            };
+        }
+
+        // Get yearly cash flow summary
+        function getYearlyCashFlows() {
+            const cashFlows = calculateCashFlows();
+            const yearlyData = {};
+            
+            cashFlows.forEach(cf => {
+                const year = Math.ceil(cf.month / 12);
+                if (!yearlyData[year]) {
+                    yearlyData[year] = {
+                        year,
+                        interestPayment: 0,
+                        scheduledPrincipal: 0,
+                        prepayment: 0,
+                        totalPayment: 0,
+                        endBalance: 0
+                    };
+                }
+                
+                yearlyData[year].interestPayment += cf.interestPayment;
+                yearlyData[year].scheduledPrincipal += cf.scheduledPrincipal;
+                yearlyData[year].prepayment += cf.prepayment;
+                yearlyData[year].totalPayment += cf.totalPayment;
+                yearlyData[year].endBalance = cf.remainingBalance;
+            });
+            
+            return Object.values(yearlyData);
+        }
+
+        // Calculate pool balance over time for different PSA speeds
+        function calculatePoolBalances() {
+            const psaSpeeds = [0, 50, 100, 200];
+            const data = [];
+            
+            for (let year = 0; year <= 30; year++) {
+                const yearData = { year };
+                
+                psaSpeeds.forEach(speed => {
+                    // Save current state
+                    const oldPsaSpeed = state.psaSpeed;
+                    const oldPrepayModel = state.prepaymentModel;
+                    
+                    // Set temporary state for calculation
+                    state.psaSpeed = speed;
+                    state.prepaymentModel = speed === 0 ? 'NONE' : 'PSA';
+                    
+                    // Calculate remaining balance at this year
+                    if (year === 0) {
+                        yearData['PSA ' + speed + '%'] = 100;
+                    } else {
+                        const flows = calculateCashFlows();
+                        const monthIndex = Math.min(year * 12 - 1, flows.length - 1);
+                        if (monthIndex >= 0 && monthIndex < flows.length) {
+                            const balance = flows[monthIndex].remainingBalance / (state.poolSize * 1000000) * 100;
+                            yearData['PSA ' + speed + '%'] = balance;
+                        } else {
+                            yearData['PSA ' + speed + '%'] = 0;
+                        }
+                    }
+                    
+                    // Restore original state
+                    state.psaSpeed = oldPsaSpeed;
+                    state.prepaymentModel = oldPrepayModel;
+                });
+                
+                data.push(yearData);
+            }
+            
+            return data;
+        }
+
         // Initialize charts
         function initializeCharts() {
-            const ctx1 = document.getElementById('bondValueChart').getContext('2d');
-            bondValueChart = new Chart(ctx1, {
-                type: 'line',
-                data: {
-                    labels: [2, 3, 4, 5, 6, 7, 8],
-                    datasets: [{
-                        label: 'Bond Value ($M)',
-                        data: [120, 110, 100, 95, 92, 90, 88],
-                        borderColor: '#4338ca',
-                        backgroundColor: 'rgba(67, 56, 202, 0.1)',
-                        tension: 0.3,
-                        fill: true
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false
-                }
-            });
-
-            const ctx2 = document.getElementById('cashFlowChart').getContext('2d');
-            cashFlowChart = new Chart(ctx2, {
-                type: 'bar',
-                data: {
-                    labels: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
-                    datasets: [
-                        {
-                            label: 'Interest',
-                            data: [4.5, 4.3, 4.1, 3.9, 3.6, 3.4, 3.1, 2.9, 2.6, 2.3],
-                            backgroundColor: '#8884d8'
-                        },
-                        {
-                            label: 'Scheduled Principal',
-                            data: [1.5, 1.7, 1.9, 2.1, 2.4, 2.6, 2.9, 3.1, 3.4, 3.7],
-                            backgroundColor: '#82ca9d'
-                        },
-                        {
-                            label: 'Prepayment',
-                            data: [1.0, 1.2, 1.5, 1.8, 2.0, 2.2, 2.5, 2.7, 3.0, 3.2],
-                            backgroundColor: '#ffc658'
-                        }
-                    ]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    scales: {
-                        x: {
-                            stacked: true,
-                            title: {
-                                display: true,
-                                text: 'Year'
-                            }
-                        },
-                        y: {
-                            stacked: true,
-                            title: {
-                                display: true,
-                                text: 'Cash Flow ($M)'
-                            }
-                        }
-                    }
-                }
-            });
-
-            const ctx3 = document.getElementById('bondValueDetailChart').getContext('2d');
-            bondValueDetailChart = new Chart(ctx3, {
-                type: 'line',
-                data: {
-                    labels: [2, 2.5, 3, 3.5, 4, 4.5, 5, 5.5, 6, 6.5, 7, 7.5, 8],
-                    datasets: [{
-                        label: 'Bond Value ($M)',
-                        data: [120, 115, 110, 105, 100, 97, 95, 93, 92, 91, 90, 89, 88],
-                        borderColor: '#4338ca',
-                        backgroundColor: 'rgba(67, 56, 202, 0.1)',
-                        tension: 0.3,
-                        fill: true
+            // Bond Value Chart (Overview)
+            bondValueChart = new Chart(
+                document.getElementById('bondValueChart').getContext('2d'),
+                {
+                    type: 'line',
+                    data: {
+                        datasets: [{
+                            label: 'Bond Value ($M)',
+                            borderColor: '#4338ca',
+                            backgroundColor: 'rgba(67, 56, 202, 0.1)',
+                            tension: 0.3,
+                            fill: true
+                        }]
                     },
-                    {
-                        label: 'Duration (Years)',
-                        data: [4.5, 4.8, 5.0, 5.3, 5.5, 5.8, 6.0, 6.2, 6.5, 6.7, 7.0, 7.2, 7.5],
-                        borderColor: '#10b981',
-                        borderDash: [5, 5],
-                        tension: 0.3,
-                        fill: false
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    scales: {
-                        x: {
-                            title: {
-                                display: true,
-                                text: 'Interest Rate (%)'
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            x: {
+                                title: {
+                                    display: true,
+                                    text: 'Interest Rate (%)'
+                                }
+                            },
+                            y: {
+                                title: {
+                                    display: true,
+                                    text: 'Bond Value ($M)'
+                                }
                             }
                         }
                     }
                 }
-            });
+            );
+            
+            // Cash Flow Chart (Overview)
+            cashFlowChart = new Chart(
+                document.getElementById('cashFlowChart').getContext('2d'),
+                {
+                    type: 'bar',
+                    data: {
+                        datasets: [
+                            {
+                                label: 'Interest',
+                                backgroundColor: '#8884d8',
+                                stack: 'Stack 0'
+                            },
+                            {
+                                label: 'Scheduled Principal',
+                                backgroundColor: '#82ca9d',
+                                stack: 'Stack 0'
+                            },
+                            {
+                                label: 'Prepayment',
+                                backgroundColor: '#ffc658',
+                                stack: 'Stack 0'
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            x: {
+                                stacked: true,
+                                title: {
+                                    display: true,
+                                    text: 'Year'
+                                }
+                            },
+                            y: {
+                                stacked: true,
+                                title: {
+                                    display: true,
+                                    text: 'Cash Flow ($M)'
+                                }
+                            }
+                        }
+                    }
+                }
+            );
+            
+            // Bond Value Detail Chart
+            bondValueDetailChart = new Chart(
+                document.getElementById('bondValueDetailChart').getContext('2d'),
+                {
+                    type: 'line',
+                    data: {
+                        datasets: [
+                            {
+                                label: 'Bond Value ($M)',
+                                borderColor: '#4338ca',
+                                backgroundColor: 'rgba(67, 56, 202, 0.1)',
+                                yAxisID: 'y',
+                                tension: 0.3,
+                                fill: true
+                            },
+                            {
+                                label: 'Duration (Years)',
+                                borderColor: '#10b981',
+                                yAxisID: 'y1',
+                                tension: 0.3,
+                                borderDash: [5, 5]
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            x: {
+                                title: {
+                                    display: true,
+                                    text: 'Interest Rate (%)'
+                                }
+                            },
+                            y: {
+                                type: 'linear',
+                                display: true,
+                                position: 'left',
+                                title: {
+                                    display: true,
+                                    text: 'Bond Value ($M)'
+                                }
+                            },
+                            y1: {
+                                type: 'linear',
+                                display: true,
+                                position: 'right',
+                                title: {
+                                    display: true,
+                                    text: 'Duration (Years)'
+                                },
+                                grid: {
+                                    drawOnChartArea: false
+                                }
+                            }
+                        }
+                    }
+                }
+            );
+            
+            // Cash Flow Detail Chart
+            cashFlowDetailChart = new Chart(
+                document.getElementById('cashFlowDetailChart').getContext('2d'),
+                {
+                    type: 'bar',
+                    data: {
+                        datasets: [
+                            {
+                                label: 'Interest',
+                                backgroundColor: '#8884d8',
+                                stack: 'Stack 0'
+                            },
+                            {
+                                label: 'Scheduled Principal',
+                                backgroundColor: '#82ca9d',
+                                stack: 'Stack 0'
+                            },
+                            {
+                                label: 'Prepayment',
+                                backgroundColor: '#ffc658',
+                                stack: 'Stack 0'
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            x: {
+                                stacked: true,
+                                title: {
+                                    display: true,
+                                    text: 'Year'
+                                }
+                            },
+                            y: {
+                                stacked: true,
+                                title: {
+                                    display: true,
+                                    text: 'Cash Flow ($M)'
+                                }
+                            }
+                        }
+                    }
+                }
+            );
+            
+            // PSA Curve Chart
+            psaCurveChart = new Chart(
+                document.getElementById('psaCurveChart').getContext('2d'),
+                {
+                    type: 'line',
+                    data: {
+                        datasets: [
+                            {
+                                label: 'PSA 50%',
+                                borderColor: '#8884d8',
+                                tension: 0.3
+                            },
+                            {
+                                label: 'PSA 100%',
+                                borderColor: '#82ca9d',
+                                tension: 0.3
+                            },
+                            {
+                                label: 'PSA 200%',
+                                borderColor: '#ffc658',
+                                tension: 0.3
+                            },
+                            {
+                                label: 'Current PSA Setting',
+                                borderColor: '#ef4444',
+                                borderWidth: 3,
+                                tension: 0.3
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            x: {
+                                title: {
+                                    display: true,
+                                    text: 'Month'
+                                }
+                            },
+                            y: {
+                                title: {
+                                    display: true,
+                                    text: 'Annual CPR (%)'
+                                }
+                            }
+                        }
+                    }
+                }
+            );
+            
+            // Pool Balance Chart
+            poolBalanceChart = new Chart(
+                document.getElementById('poolBalanceChart').getContext('2d'),
+                {
+                    type: 'line',
+                    data: {
+                        datasets: [
+                            {
+                                label: 'No Prepayment',
+                                borderColor: '#8884d8',
+                                tension: 0.3
+                            },
+                            {
+                                label: 'PSA 50%',
+                                borderColor: '#82ca9d',
+                                tension: 0.3
+                            },
+                            {
+                                label: 'PSA 100%',
+                                borderColor: '#ffc658',
+                                tension: 0.3
+                            },
+                            {
+                                label: 'PSA 200%',
+                                borderColor: '#ef4444',
+                                tension: 0.3
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            x: {
+                                title: {
+                                    display: true,
+                                    text: 'Year'
+                                }
+                            },
+                            y: {
+                                title: {
+                                    display: true,
+                                    text: 'Remaining Balance (%)'
+                                },
+                                min: 0,
+                                max: 100
+                            }
+                        }
+                    }
+                }
+            );
+            
+            // Tranche Cash Flow Chart
+            trancheCashFlowChart = new Chart(
+                document.getElementById('trancheCashFlowChart').getContext('2d'),
+                {
+                    type: 'bar',
+                    data: {
+                        datasets: [
+                            {
+                                label: 'Interest',
+                                backgroundColor: '#8884d8',
+                                stack: 'Stack 0'
+                            },
+                            {
+                                label: 'Principal',
+                                backgroundColor: '#82ca9d',
+                                stack: 'Stack 0'
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            x: {
+                                stacked: true,
+                                title: {
+                                    display: true,
+                                    text: 'Year'
+                                }
+                            },
+                            y: {
+                                stacked: true,
+                                title: {
+                                    display: true,
+                                    text: 'Cash Flow ($M)'
+                                }
+                            }
+                        }
+                    }
+                }
+            );
+        }
+        
+        // Update charts with current data
+        function updateCharts() {
+            // Update Bond Value Chart (Overview)
+            bondValueChart.data.labels = state.bondValueData.map(d => d.rate);
+            bondValueChart.data.datasets[0].data = state.bondValueData.map(d => d.value);
+            bondValueChart.update();
+            
+            // Update Cash Flow Chart (Overview)
+            const yearlyFlows = getYearlyCashFlows().slice(0, 15);
+            cashFlowChart.data.labels = yearlyFlows.map(d => d.year);
+            cashFlowChart.data.datasets[0].data = yearlyFlows.map(d => d.interestPayment / 1000000);
+            cashFlowChart.data.datasets[1].data = yearlyFlows.map(d => d.scheduledPrincipal / 1000000);
+            cashFlowChart.data.datasets[2].data = yearlyFlows.map(d => d.prepayment / 1000000);
+            cashFlowChart.update();
+            
+            // Update Bond Value Detail Chart
+            bondValueDetailChart.data.labels = state.bondValueData.map(d => d.rate);
+            bondValueDetailChart.data.datasets[0].data = state.bondValueData.map(d => d.value);
+            bondValueDetailChart.data.datasets[1].data = state.bondValueData.map(d => d.duration);
+            bondValueDetailChart.update();
+            
+            // Update Cash Flow Detail Chart
+            cashFlowDetailChart.data.labels = yearlyFlows.map(d => d.year);
+            cashFlowDetailChart.data.datasets[0].data = yearlyFlows.map(d => d.interestPayment / 1000000);
+            cashFlowDetailChart.data.datasets[1].data = yearlyFlows.map(d => d.scheduledPrincipal / 1000000);
+            cashFlowDetailChart.data.datasets[2].data = yearlyFlows.map(d => d.prepayment / 1000000);
+            cashFlowDetailChart.update();
+            
+            // Update PSA Curve Chart
+            const months = Array.from({length: 60}, (_, i) => i + 1);
+            psaCurveChart.data.labels = months;
+            psaCurveChart.data.datasets[0].data = months.map(m => calculatePsaRate(m, 50) * 12 * 100);
+            psaCurveChart.data.datasets[1].data = months.map(m => calculatePsaRate(m, 100) * 12 * 100);
+            psaCurveChart.data.datasets[2].data = months.map(m => calculatePsaRate(m, 200) * 12 * 100);
+            psaCurveChart.data.datasets[3].data = months.map(m => calculatePsaRate(m, state.psaSpeed) * 12 * 100);
+            psaCurveChart.update();
+            
+            // Update Pool Balance Chart
+            const balanceData = calculatePoolBalances();
+            poolBalanceChart.data.labels = balanceData.map(d => d.year);
+            poolBalanceChart.data.datasets[0].data = balanceData.map(d => d['PSA 0%']);
+            poolBalanceChart.data.datasets[1].data = balanceData.map(d => d['PSA 50%']);
+            poolBalanceChart.data.datasets[2].data = balanceData.map(d => d['PSA 100%']);
+            poolBalanceChart.data.datasets[3].data = balanceData.map(d => d['PSA 200%']);
+            poolBalanceChart.update();
+            
+            // Update Tranche Cash Flow Chart
+            const trancheData = state.trancheData[state.selectedTranche];
+            const years = Array.from({length: 15}, (_, i) => i + 1);
+            trancheCashFlowChart.data.labels = years;
+            trancheCashFlowChart.data.datasets[0].data = trancheData.yearlyInterest.slice(0, 15).map(v => v / 1000000);
+            trancheCashFlowChart.data.datasets[1].data = trancheData.yearlyPrincipal.slice(0, 15).map(v => v / 1000000);
+            trancheCashFlowChart.update();
+        }
 
-            const ctx4 = document.getElementById('cashFlowDetailChart').getContext('2d');
-            cashFlowDetailChart = new Chart(ctx4, {
-                type: 'bar',
-                data: {
-                    labels: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15],
-                    datasets: [
-                        {
-                            label: 'Interest',
-                            data: [4.5, 4.3, 4.1, 3.9, 3.6, 3.4, 3.1, 2.9, 2.6, 2.3, 2.0, 1.7, 1.4, 1.1, 0.8],
-                            backgroundColor: '#8884d8'
-                        },
-                        {
-                            label: 'Scheduled Principal',
-                            data: [1.5, 1.7, 1.9, 2.1, 2.4, 2.6, 2.9, 3.1, 3.4, 3.7, 4.0, 4.3, 4.6, 4.9, 5.2],
-                            backgroundColor: '#82ca9d'
-                        },
-                        {
-                            label: 'Prepayment',
-                            data: [1.0, 1.2, 1.5, 1.8, 2.0, 2.2, 2.5, 2.7, 3.0, 3.2, 3.5, 3.7, 4.0, 4.2, 4.5],
-                            backgroundColor: '#ffc658'
-                        }
-                    ]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    scales: {
-                        x: {
-                            stacked: true,
-                            title: {
-                                display: true,
-                                text: 'Year'
-                            }
-                        },
-                        y: {
-                            stacked: true,
-                            title: {
-                                display: true,
-                                text: 'Cash Flow ($M)'
-                            }
-                        }
-                    }
-                }
-            });
-
-            const ctx5 = document.getElementById('psaCurveChart').getContext('2d');
-            psaCurveChart = new Chart(ctx5, {
-                type: 'line',
-                data: {
-                    labels: Array.from({length: 60}, (_, i) => i + 1),
-                    datasets: [
-                        {
-                            label: 'PSA 50%',
-                            data: Array.from({length: 60}, (_, i) => {
-                                const month = i + 1;
-                                return calculatePsaRate(month, 50) * 12 * 100;
-                            }),
-                            borderColor: '#8884d8',
-                            tension: 0.3
-                        },
-                        {
-                            label: 'PSA 100%',
-                            data: Array.from({length: 60}, (_, i) => {
-                                const month = i + 1;
-                                return calculatePsaRate(month, 100) * 12 * 100;
-                            }),
-                            borderColor: '#82ca9d',
-                            tension: 0.3
-                        },
-                        {
-                            label: 'PSA 200%',
-                            data: Array.from({length: 60}, (_, i) => {
-                                const month = i + 1;
-                                return calculatePsaRate(month, 200) * 12 * 100;
-                            }),
-                            borderColor: '#ffc658',
-                            tension: 0.3
-                        }
-                    ]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    scales: {
-                        x: {
-                            title: {
-                                display: true,
-                                text: 'Month'
-                            }
-                        },
-                        y: {
-                            title: {
-                                display: true,
-                                text: 'Annual CPR (%)'
-                            }
-                        }
-                    }
-                }
-            });
-
-            const ctx6 = document.getElementById('trancheCashFlowChart').getContext('2d');
-            trancheCashFlowChart = new Chart(ctx6, {
-                type: 'bar',
-                data: {
-                    labels: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
-                    datasets: [
-                        {
-                            label: 'Interest',
-                            data: [2.8, 2.6, 2.4, 2.2, 2.0, 1.8, 1.6, 1.4, 1.2, 1.0],
-                            backgroundColor: '#8884d8'
-                        },
-                        {
-                            label: 'Principal',
-                            data: [4.2, 4.4, 4.6, 4.8, 5.0, 5.2, 5.4, 5.6, 5.8, 6.0],
-                            backgroundColor: '#82ca9d'
-                        }
-                    ]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    scales: {
-                        x: {
-                            stacked: true,
-                            title: {
-                                display: true,
-                                text: 'Year'
-                            }
-                        },
-                        y: {
-                            stacked: true,
-                            title: {
-                                display: true,
-                                text: 'Cash Flow ($M)'
-                            }
-                        }
-                    }
-                }
+        // Update Cash Flow Table
+        function updateCashFlowTable() {
+            const tableBody = document.getElementById('cashFlowTableBody');
+            tableBody.innerHTML = '';
+            
+            const yearlyFlows = getYearlyCashFlows().slice(0, 5);
+            yearlyFlows.forEach(year => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${year.year}</td>
+                    <td>${formatCurrency(year.interestPayment)}</td>
+                    <td>${formatCurrency(year.scheduledPrincipal)}</td>
+                    <td>${formatCurrency(year.prepayment)}</td>
+                    <td>${formatCurrency(year.totalPayment)}</td>
+                    <td>${formatCurrency(year.endBalance)}</td>
+                `;
+                tableBody.appendChild(row);
             });
         }
 
-        // Update UI values based on user inputs
+        // Update UI with calculated values
         function updateUI() {
-            // Update display values
-            document.getElementById('interestRateValue').textContent = state.interestRate.toFixed(1) + '%';
-            document.getElementById('psaSpeedValue').textContent = state.psaSpeed + '%';
-            document.getElementById('poolSizeValue').textContent = '$' + state.poolSize + 'M';
-            document.getElementById('couponRateValue').textContent = state.couponRate.toFixed(2) + '%';
-            document.getElementById('trancheLabel').textContent = 'Tranche ' + state.selectedTranche;
+            // Calculate data
+            state.bondValueData = calculateBondValues();
+            state.trancheData = calculateTrancheCashFlows();
+            state.pvData = calculatePresentValue();
             
-            // Update tranche values based on pool size
-            document.getElementById('trancheAValue').textContent = formatCurrency(state.poolSize * 1000000 * 0.7);
-            document.getElementById('trancheBValue').textContent = formatCurrency(state.poolSize * 1000000 * 0.15);
-            document.getElementById('trancheCValue').textContent = formatCurrency(state.poolSize * 1000000 * 0.1);
-            document.getElementById('trancheZValue').textContent = formatCurrency(state.poolSize * 1000000 * 0.05);
+            // Update summary metrics
+            const bondValue = state.bondValueData.find(d => Math.abs(d.rate - state.interestRate) < 0.2);
+            document.getElementById('currentBondValue').textContent = '$' + (bondValue ? bondValue.value.toFixed(2) : 'N/A') + 'M';
+            document.getElementById('presentValue').textContent = '$' + (state.pvData.presentValue / 1000000).toFixed(2) + 'M';
+            
+            const selectedTranche = state.trancheData[state.selectedTranche];
+            document.getElementById('wal').textContent = selectedTranche.WAL.toFixed(2) + ' years';
+            document.getElementById('trancheLabel').textContent = 'Tranche ' + state.selectedTranche;
+            document.getElementById('trancheYield').textContent = (selectedTranche.yield * 100).toFixed(2) + '%';
+            
+            // Update tranche values
+            document.getElementById('trancheAValue').textContent = formatCurrency(state.trancheData.A.originalBalance);
+            document.getElementById('trancheBValue').textContent = formatCurrency(state.trancheData.B.originalBalance);
+            document.getElementById('trancheCValue').textContent = formatCurrency(state.trancheData.C.originalBalance);
+            document.getElementById('trancheZValue').textContent = formatCurrency(state.trancheData.Z.originalBalance);
+            
+            // Update present value calculation fields
+            document.getElementById('pvPoolSize').textContent = formatCurrency(state.poolSize * 1000000);
+            document.getElementById('futureCashFlows').textContent = formatCurrency(state.pvData.futureValue);
+            document.getElementById('discountAmount').textContent = formatCurrency(state.pvData.discount);
+            document.getElementById('pvTotal').textContent = formatCurrency(state.pvData.presentValue);
+            document.getElementById('discountRate').textContent = state.pvData.discountRate.toFixed(4);
+            
+            // Update selected tranche details
+            document.getElementById('trancheOriginalBalance').textContent = formatCurrency(selectedTranche.originalBalance);
+            document.getElementById('trancheCouponRate').textContent = formatPercentage(selectedTranche.rate);
+            document.getElementById('trancheWAL').textContent = selectedTranche.WAL.toFixed(2) + ' years';
+            document.getElementById('selectedTrancheYield').textContent = (selectedTranche.yield * 100).toFixed(2) + '%';
+            document.getElementById('tranchePV').textContent = formatCurrency(selectedTranche.presentValue);
+            
+            // Update cash flow table
+            updateCashFlowTable();
+            
+            // Update all charts
+            updateCharts();
         }
 
         // Setup event listeners
@@ -849,21 +1439,25 @@
             // Input sliders and dropdowns
             document.getElementById('interestRate').addEventListener('input', function(e) {
                 state.interestRate = parseFloat(e.target.value);
+                document.getElementById('interestRateValue').textContent = state.interestRate.toFixed(1) + '%';
                 updateUI();
             });
             
             document.getElementById('psaSpeed').addEventListener('input', function(e) {
                 state.psaSpeed = parseInt(e.target.value);
+                document.getElementById('psaSpeedValue').textContent = state.psaSpeed + '%';
                 updateUI();
             });
             
             document.getElementById('poolSize').addEventListener('input', function(e) {
                 state.poolSize = parseInt(e.target.value);
+                document.getElementById('poolSizeValue').textContent = '$' + state.poolSize + 'M';
                 updateUI();
             });
             
             document.getElementById('couponRate').addEventListener('input', function(e) {
                 state.couponRate = parseFloat(e.target.value);
+                document.getElementById('couponRateValue').textContent = state.couponRate.toFixed(2) + '%';
                 updateUI();
             });
             
